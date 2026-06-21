@@ -6,7 +6,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "hello": "ts-node src/01-basics/01-hello-solana.ts",
-    "transfer": "ts-node src/01-basics/02-transfer.ts"
+    "transfer": "ts-node src/01-basics/02-transfer.ts",
+    "jupiter": "ts-node src/02-dex/01-jupiter-quote.ts",
+    "swap": "ts-node src/02-dex/02-swap-full.ts",
+    "raydium": "ts-node src/02-dex/03-raydium-pool.ts",
+    "rpc": "ts-node src/02-dex/04-rpc-direct.ts"
   },
   "keywords": [],
   "author": "",
@@ -14,7 +18,7 @@
   "dependencies": {
     "@solana/web3.js": "^1.73.0",
     "bs58": "^6.0.0",
-    "https-proxy-agent": "^5.0.1",
+    "https-proxy-agent": "^7.0.6",
     "node-fetch": "^2.7.0"
   },
   "devDependencies": {

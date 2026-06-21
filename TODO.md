@@ -22,19 +22,19 @@
 搭建本地开发环境，理解 Solana 核心概念，用 TS 完成基本链上操作。
 
 ### 环境搭建
-- [ ] 安装 Solana CLI (`sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"`)
-- [ ] 安装 Node.js + npm/pnpm
-- [ ] 启动本地验证器 `solana-test-validator`
-- [ ] 创建开发钱包 `solana-keygen new`
-- [ ] 配置 CLI 指向本地验证器 `solana config set --url localhost`
-- [ ] 领取测试 SOL `solana airdrop 2`
+- [x] 安装 Solana CLI — 手动安装 v1.18.26（系统 GLIBC 太旧无法用官方脚本），路径 `/opt/solana-v1.18.26/`
+- [x] 安装 Node.js + npm — v20.11.1 LTS
+- [ ] 启动本地验证器 `solana-test-validator`（暂用 devnet）
+- [x] 创建开发钱包 `solana-keygen new` — 地址 `EUiFrwRBgCoAeXWLFZUP1ZfFY7BuhY9bFznzbPygVt7A`
+- [x] 配置 CLI — 指向 devnet（`solana config set --url devnet`）
+- [x] 领取测试 SOL — devnet 5 SOL（从 faucet.solana.com）
 
 ### 链上操作（TypeScript）
-- [ ] 初始化 TS 项目 `npm init -y`
-- [ ] 安装 `@solana/web3.js`
-- [ ] 连接本地 Solana 集群
-- [ ] 创建钱包并查看余额
-- [ ] 发送一笔 SOL 转账
+- [x] 初始化 TS 项目 `npm init -y`
+- [x] 安装 `@solana/web3.js@1.73.0`（降级以兼容 ts-node CommonJS）
+- [x] 连接 Solana 集群 — `src/01-basics/01-hello-solana.ts`（`npm run hello`）
+- [x] 创建钱包并查看余额
+- [x] 发送一笔 SOL 转账 — `src/01-basics/02-transfer.ts`（`npm run transfer`），0.1 SOL
 - [ ] 查询交易签名详情
 - [ ] 理解 Blockhash / Signature / Account 概念
 
@@ -51,16 +51,18 @@
 接入主流 DEX，读取价格数据，理解流动性池机制。
 
 ### Jupiter Aggregator
-- [ ] 注册 [Jupiter API](https://station.jup.ag/docs/apis/swap-api)（免费）
-- [ ] 用 TS 调用 Jupiter 价格查询 API
-- [ ] 用 TS 调用 Jupiter Swap API 完成一笔 swap
-- [ ] 理解 Jupiter 聚合路由原理
+- [x] Jupiter API 无需注册，免费使用
+- [x] 用 TS 调用 Jupiter 价格查询 API — `src/02-dex/01-jupiter-quote.ts`（`npm run jupiter`）
+- [x] 用 TS 调用 Jupiter Swap API 生成交易 — `/swap/v1/swap` POST 返回 base64 交易
+- [x] 完整 swap 流程（quote → swap → sign）— `src/02-dex/02-swap-full.ts`（`npm run swap`）
+- [ ] 完成一笔真实 swap（需要主网 0.01 SOL）
+- [x] 理解 Jupiter 聚合路由原理 — 路由自动选择最优 DEX（BisonFi/TesseraV 等）
 
 ### Raydium
-- [ ] 安装 `@raydium-io/raydium-sdk`
+- [ ] 安装 `@raydium-io/raydium-sdk`（暂未安装，Raydium API 频繁改版）
 - [ ] 查询 Raydium 流动池列表
 - [ ] 读取特定交易对的储备量和价格
-- [ ] 理解 AMM 恒定乘积公式（x * y = k）
+- [x] 理解 AMM 恒定乘积公式（x * y = k）— `src/02-dex/03-raydium-pool.ts`（`npm run raydium`）
 
 ### 价格监控 Bot
 - [ ] 用 WebSocket 订阅链上交易（Helius / QuickNode）
@@ -148,12 +150,24 @@ solana_cookbook/
 
 ## 里程碑检查
 
-| 时间 | 检查点 | 通过标准 |
-|------|--------|---------|
-| Week 2 末 | 能发一笔 SOL 转账 | TS 代码成功发送并确认 |
-| Week 4 末 | 能查任意代币价格 | 读取 Jupiter/Raydium 价格并展示 |
-| Week 6 末 | 能跑套利框架 | Devnet 上完成一笔模拟套利 |
-| Week 8 末 | 有完整的主网分析报告 | 了解真实市场机会和竞争格局 |
+| 时间 | 检查点 | 通过标准 | 状态 |
+|------|--------|---------|------|
+| Week 2 末 | 能发一笔 SOL 转账 | TS 代码成功发送并确认 | ✅ 已完成 |
+| Week 4 末 | 能查任意代币价格 | 读取 Jupiter/Raydium 价格并展示 | ✅ 已完成（Jupiter quote/price） |
+| Week 6 末 | 能跑套利框架 | Devnet 上完成一笔模拟套利 | 🔲 未开始 |
+| Week 8 末 | 有完整的主网分析报告 | 了解真实市场机会和竞争格局 | 🔲 未开始 |
+
+---
+
+## 进度日志
+
+### 2026-06-21
+- Week 1-2 基础全部跑通：连接、余额、转账（01-hello-solana.ts, 02-transfer.ts）
+- Week 3-4 Jupiter 部分完成：API 调用（quote/price/swap 生成）、完整 swap 链路（sign 前全部通过）
+- Week 3-4 Raydium 部分完成：AMM 原理演示、链上数据分析框架
+- **待办**：主网 swap Step 4-5（需 0.01 SOL）、价格监控 WebSocket、注册 Helius RPC
+- **已推送**：GitHub commit `4ec2f9a`（02-transfer.ts + package.json）
+- **踩坑记录**：代理问题（node-fetch@2.x 不读 HTTPS_PROXY）、@solana/web3.js Connection 不支持代理
 
 ---
 

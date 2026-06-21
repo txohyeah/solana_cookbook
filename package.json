@@ -1,0 +1,25 @@
+{
+  "name": "solana_cookbook",
+  "version": "1.0.0",
+  "description": "学习 Solana 开发的个人练习仓库。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "hello": "ts-node src/01-basics/01-hello-solana.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@solana/web3.js": "^1.73.0",
+    "bs58": "^6.0.0",
+    "https-proxy-agent": "^5.0.1",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "@types/node-fetch": "^2.6.13",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}

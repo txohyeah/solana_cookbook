@@ -89,11 +89,11 @@
 - [ ] 理解 Recent Blockhash 过期机制
 
 ### 套利框架
-- [ ] 实现价格差检测模块（监控 2+ DEX 价格）
-- [ ] 实现套利执行模块（原子交易：A 买入 + B 卖出）
-- [ ] 加入滑点保护（slippage tolerance）
+- [x] 实现价格差检测模块（监控 2+ DEX 价格）— `src/03-arbitrage/02-spread-detector.ts`
+- [x] 实现套利执行模块（原子交易：A 买入 + B 卖出）— `src/03-arbitrage/03-arbitrage-bot.ts`（模拟模式）
+- [x] 加入滑点保护（slippage tolerance）
 - [ ] 加入交易失败重试逻辑
-- [ ] 记录每笔交易的 PnL（盈亏）
+- [x] 记录每笔交易的 PnL（盈亏）
 
 ### 基础设施
 - [ ] 注册 RPC 节点服务（Helius 免费层 / QuickNode）
@@ -154,12 +154,22 @@ solana_cookbook/
 |------|--------|---------|------|
 | Week 2 末 | 能发一笔 SOL 转账 | TS 代码成功发送并确认 | ✅ 已完成 |
 | Week 4 末 | 能查任意代币价格 | 读取 Jupiter/Raydium 价格并展示 | ✅ 已完成（Jupiter quote/price） |
-| Week 6 末 | 能跑套利框架 | Devnet 上完成一笔模拟套利 | 🔲 未开始 |
+| Week 6 末 | 能跑套利框架 | Devnet 上完成一笔模拟套利 | 🔵 进行中 |
 | Week 8 末 | 有完整的主网分析报告 | 了解真实市场机会和竞争格局 | 🔲 未开始 |
 
 ---
 
 ## 进度日志
+
+### 2026-06-22
+- Week 5-6 套利框架搭建：
+  - 创建 `src/utils/rpc.ts` — 原生 HTTP RPC 工具（绕过 Connection 代理问题）
+  - 创建 `src/03-arbitrage/01-price-monitor.ts` — 价格监控模块
+  - 创建 `src/03-arbitrage/02-spread-detector.ts` — 价差检测模块
+  - 创建 `src/03-arbitrage/03-arbitrage-bot.ts` — 套利机器人框架（模拟模式）
+- 修复 `03-raydium-pool.ts` — 使用原生 RPC 读取链上数据
+- **发现**：Jupiter 已优化路由，不同路由间价差很小，扣除手续费后难以盈利
+- **下一步**：注册 Helius RPC（WebSocket 支持）、接入多 DEX 实时价格
 
 ### 2026-06-21
 - Week 1-2 基础全部跑通：连接、余额、转账（01-hello-solana.ts, 02-transfer.ts）

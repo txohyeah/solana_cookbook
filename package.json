@@ -10,7 +10,10 @@
     "jupiter": "ts-node src/02-dex/01-jupiter-quote.ts",
     "swap": "ts-node src/02-dex/02-swap-full.ts",
     "raydium": "ts-node src/02-dex/03-raydium-pool.ts",
-    "rpc": "ts-node src/02-dex/04-rpc-direct.ts"
+    "rpc": "ts-node src/02-dex/04-rpc-direct.ts",
+    "monitor": "ts-node src/03-arbitrage/01-price-monitor.ts",
+    "spread": "ts-node src/03-arbitrage/02-spread-detector.ts",
+    "bot": "ts-node src/03-arbitrage/03-arbitrage-bot.ts"
   },
   "keywords": [],
   "author": "",

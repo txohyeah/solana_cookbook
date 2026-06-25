@@ -15,26 +15,15 @@
  *   当链上某池子价格与外部价格（如 Jupiter 聚合价）出现偏差时，
  *   套利者通过交易把价格"搬"回来，同时赚取差价。
  *
- * 本示例通过 Solana RPC 直接读取链上 Raydium 流动池数据，
- * 不依赖第三方 API，更可靠。
+ * 本示例使用原生 HTTP RPC 直接读取链上数据（绕过 Connection 代理问题）
  */
 
-import { Connection, PublicKey } from '@solana/web3.js';
-import fetch from 'node-fetch';
-import { HttpsProxyAgent } from 'https-proxy-agent';
-
-// ─── 配置 ──────────────────────────────────────────────
-
-const RPC_URL = 'https://api.mainnet-beta.solana.com';
-const JUPITER_API = 'https://api.jup.ag';
-const PROXY_URL = process.env.HTTPS_PROXY || 'http://127.0.0.1:7890';
-const agent = new HttpsProxyAgent(PROXY_URL);
-
-const connection = new Connection(RPC_URL, 'confirmed');
+import bs58 from 'bs58';
+import { rpcCall, jupiterGet, TOKENS } from '../utils';
 
 // 常用代币
-const SOL_MINT  = new PublicKey('So11111111111111111111111111111111111111112');
-const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+const SOL_MINT  = TOKENS.SOL;
+const USDC_MINT = TOKENS.USDC;
 
 /** 已知的 Raydium SOL/USDC AMM 池子（主网） */
 const KNOWN_POOLS = {
@@ -42,20 +31,6 @@ const KNOWN_POOLS = {
   '58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2': { name: 'Raydium SOL/USDC (v4)', decimalsA: 9, decimalsB: 6 },
   // 可以添加更多池子
 };
-
-// ─── 辅助函数 ──────────────────────────────────────────
-
-async function jupiterGet(path: string, params?: Record<string, string>): Promise<any> {
-  const url = new URL(`${JUPITER_API}${path}`);
-  if (params) {
-    for (const [k, v] of Object.entries(params)) {
-      url.searchParams.set(k, v);
-    }
-  }
-  const res = await fetch(url.toString(), { agent: agent as any });
-  if (!res.ok) throw new Error(`Jupiter ${res.status}`);
-  return res.json();
-}
 
 // ─── 1. AMM 恒定乘积公式演示 ────────────────────────────
 
@@ -156,16 +131,19 @@ function calculateSlippage(solReserve: number, usdcReserve: number) {
 // ─── 3. 从链上读取 Raydium 池子储备量 ────────────────────
 
 /**
- * 通过 Solana RPC 读取 Raydium AMM 池子的 token 账户余额
+ * 通过原生 RPC 读取 Raydium AMM 池子的储备量
  *
- * 每个 Raydium 池子有两个 token account（分别存两种代币），
- * 读取这两个 account 的余额就是池子的储备量。
+ * 流程：
+ *   1. 读取池子账户的原始字节
+ *   2. 解析 coinVault 和 pcVault 地址
+ *   3. 读取两个 vault 的 token 余额 = 池子储备量
  *
- * Raydium v4 池子账户结构：
- *   offset 400: coinMint (32 bytes) — 代币 A 的 Mint
- *   offset 432: pcMint (32 bytes)  — 代币 B 的 Mint
- *   offset 392: coinVault (32 bytes) — 代币 A 的金库地址
- *   offset 424: pcVault (32 bytes)  — 代币 B 的金库地址
+ * Raydium v4 池子账户结构（关键偏移量）：
+ *   offset 360: poolCoinTokenAccount (32 bytes) — 代币 A 的金库地址
+ *   offset 392: poolPcTokenAccount (32 bytes)   — 代币 B 的金库地址
+ *   offset 424: coinMintAddress (32 bytes)      — 代币 A 的 Mint
+ *   offset 456: pcMintAddress (32 bytes)        — 代币 B 的 Mint
+ *   offset 488: lpMintAddress (32 bytes)        — LP Token 的 Mint
  */
 async function readPoolOnChain() {
   console.log('\n═══════════════════════════════════════');
@@ -177,39 +155,38 @@ async function readPoolOnChain() {
     console.log(`     地址: ${poolAddress}`);
 
     try {
-      const poolPubkey = new PublicKey(poolAddress);
-      const accountInfo = await connection.getAccountInfo(poolPubkey);
+      // 1. 读取池子账户原始字节
+      const result = await rpcCall('getAccountInfo', [
+        poolAddress,
+        { encoding: 'base64' },
+      ]);
 
-      if (!accountInfo) {
+      if (!result.value) {
         console.log('     ❌ 账户不存在');
         continue;
       }
 
-      const data = accountInfo.data;
+      const data = Buffer.from(result.value.data[0], 'base64');
+      console.log(`     账户大小: ${data.length} bytes`);
 
-      // Raydium v4 AMM Pool 状态解析
-      // 参考: https://github.com/raydium-io/raydium-sdk/blob/master/src/core.ts
-      const AMM_STATE_OFFSET = 392; // vault 地址的偏移量
+      // 2. 解析 vault 地址（Raydium v4 结构）
+      const coinVault = data.slice(360, 392);   // poolCoinTokenAccount
+      const pcVault   = data.slice(392, 424);   // poolPcTokenAccount
+      const coinMint  = data.slice(424, 456);   // coinMintAddress
+      const pcMint    = data.slice(456, 488);   // pcMintAddress
 
-      // 读取 vault 地址 (每个 32 bytes)
-      const coinVault = new PublicKey(data.slice(AMM_STATE_OFFSET, AMM_STATE_OFFSET + 32));
-      const pcVault   = new PublicKey(data.slice(AMM_STATE_OFFSET + 32, AMM_STATE_OFFSET + 64));
+      console.log(`     代币 A: ${coinMint.toString('hex').slice(0, 16)}...`);
+      console.log(`     代币 B: ${pcMint.toString('hex').slice(0, 16)}...`);
 
-      // 读取 mint 地址
-      const coinMint = new PublicKey(data.slice(AMM_STATE_OFFSET + 64, AMM_STATE_OFFSET + 96));
-      const pcMint   = new PublicKey(data.slice(AMM_STATE_OFFSET + 96, AMM_STATE_OFFSET + 128));
+      // 3. 读取 vault 余额
+      const coinVaultBase58 = bs58.encode(coinVault);
+      const pcVaultBase58 = bs58.encode(pcVault);
 
-      console.log(`     代币 A: ${coinMint.toBase58().slice(0, 12)}...`);
-      console.log(`     代币 B: ${pcMint.toBase58().slice(0, 12)}...`);
-      console.log(`     金库 A: ${coinVault.toBase58().slice(0, 12)}...`);
-      console.log(`     金库 B: ${pcVault.toBase58().slice(0, 12)}...`);
+      const coinBalance = await rpcCall('getTokenAccountBalance', [coinVaultBase58]);
+      const pcBalance = await rpcCall('getTokenAccountBalance', [pcVaultBase58]);
 
-      // 读取 vault 余额
-      const coinAmountBig = await connection.getTokenAccountBalance(coinVault);
-      const pcAmountBig   = await connection.getTokenAccountBalance(pcVault);
-
-      const coinAmount = coinAmountBig.value.uiAmount || 0;
-      const pcAmount   = pcAmountBig.value.uiAmount || 0;
+      const coinAmount = coinBalance.value.uiAmount || 0;
+      const pcAmount = pcBalance.value.uiAmount || 0;
 
       console.log(`     储备 A: ${coinAmount.toLocaleString()}`);
       console.log(`     储备 B: ${pcAmount.toLocaleString()}`);
@@ -217,6 +194,9 @@ async function readPoolOnChain() {
       if (coinAmount > 0 && pcAmount > 0) {
         const price = pcAmount / coinAmount;
         console.log(`     价格: 1 代币A = ${price.toFixed(6)} 代币B`);
+
+        // 调用滑点分析
+        calculateSlippage(coinAmount, pcAmount);
       }
 
     } catch (err: any) {
@@ -238,8 +218,8 @@ async function comparePrices() {
 
   // 1. 从 Jupiter 获取聚合价
   const jupiterQuote = await jupiterGet('/swap/v1/quote', {
-    inputMint: SOL_MINT.toBase58(),
-    outputMint: USDC_MINT.toBase58(),
+    inputMint: SOL_MINT,
+    outputMint: USDC_MINT,
     amount: '1000000000', // 1 SOL
     slippageBps: '0',
   });
@@ -270,26 +250,22 @@ async function comparePrices() {
 // ─── 主流程 ────────────────────────────────────────────
 
 async function main() {
-  console.log('🚀 Raydium AMM 原理 + 链上数据\n');
+  console.log('🚀 Raydium AMM 原理 + 链上数据（原生 RPC 版）\n');
 
   try {
     // 1. AMM 公式演示
     ammDemo();
 
-    // 2. 滑点分析
-    calculateSlippage(1000, 74000);
-
-    // 3. 链上读取池子
+    // 2. 链上读取池子（会同时展示滑点分析）
     await readPoolOnChain();
 
-    // 4. 价格对比
+    // 3. Jupiter 价格
     await comparePrices();
 
     console.log('\n═══════════════════════════════════════');
     console.log('  📊 汇总');
     console.log('═══════════════════════════════════════');
     console.log('  ✅ AMM 公式演示: OK');
-    console.log('  ✅ 滑点分析: OK');
     console.log('  ✅ 链上读取池子: OK');
     console.log('  ✅ Jupiter 价格: OK');
     console.log('\n  套利核心逻辑：');
